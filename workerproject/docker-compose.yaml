@@ -1,0 +1,61 @@
+version: "3"
+volumes:
+ dados:
+networks:
+ banco:
+ web:
+ fila:
+services:
+ db:
+  image: postgres:9.6
+  environment:
+   - POSTGRES_HOST_AUTH_METHOD=trust
+  networks:
+   - banco
+  volumes:
+   #volume of data
+   - dados:/var/lib/postgresql/data
+   #script
+   - ./scripts:/scripts
+   - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+ frontend:
+  image: nginx:1.13
+  networks:
+   - web
+  volumes:
+   - ./web:/usr/share/nginx/html
+   #proxy reverse setting
+   - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+  depends_on:
+   - app
+  ports:
+   - 80:80
+ app:
+  image: python:3.6
+  volumes:
+   - ./app:/app
+  networks:
+   - banco
+   - web
+   - fila
+  depends_on:
+   - db
+   - queue
+  working_dir: /app
+  command: bash ./app.sh
+ queue:
+  image: redis:3.2
+  networks:
+   - fila
+ worker:
+  build: worker
+  #image: python:3.6
+  volumes:
+   - ./worker:/worker
+  working_dir: /worker
+  command: worker.py
+  networks:
+   - fila
+  depends_on:
+   - queue 
+
